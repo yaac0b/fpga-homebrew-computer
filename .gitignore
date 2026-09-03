@@ -1,0 +1,7 @@
+*.vcd
+*.vvp
+*_test
+*_sim# Simulation outputs
+*.vcd
+*.vvp
+*_test
