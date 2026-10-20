@@ -135,8 +135,82 @@ while (1) {
 | `poke(addr, v)`, `peek(addr)` | read/write any memory address |
 | `BLACK WHITE RED GREEN BLUE YELLOW CYAN MAGENTA ORANGE GRAY` | colour names |
 
-**Examples** (`hackl/examples/`): LED blinker, 1-second counter, ADC bar graph, voltage readout,
-scrolling voltage graph with axes, ping-pong, brick breaker.
+**Examples:** see `hackl/examples/` (list under *Repository layout*).
+
+---
+
+## Compiler and toolchain
+
+Programs are written in **HackL** (or plain Hack assembly), turned into machine code on your PC, and sent to the board.
+
+```
+ prog.hl ──hl.py──► prog.asm ──assembler.py──► prog.hack ──hack_ide.py (UART)──► FPGA
+ (HackL)           (Hack assembly)            (16-bit binary text)
+```
+
+### Files you need
+
+| File | Role | Needed for |
+|---|---|---|
+| `hl.py` | HackL compiler (HackL → Hack assembly) | compiling |
+| `assembler.py` | assembler (assembly → machine code) | `.hack` output |
+| `parser.py`, `code.py`, `symbol_table.py` | helpers used by `assembler.py` | `.hack` output |
+| `hack_ide.py` | desktop IDE: compile, assemble, upload and run | the Run button |
+| `test_hl.py` | automated tests (needs the five files above and `examples/`) | optional |
+
+Keep all of them **in the same folder**. The IDE additionally needs `pip install pyserial` and Tkinter
+(included with Python on Windows and macOS; on Linux: `sudo apt install python3-tk`).
+
+### Option A: use the IDE (easiest)
+
+```
+python hack_ide.py
+```
+
+Choose the serial port, choose **HackL** or **Assembly**, write or open a program, press **Run**.
+
+### Option B: command line
+
+```
+python hl.py blink.hl --hack
+```
+
+This creates `blink.asm` (assembly) and `blink.hack` (machine code) next to your program.
+Without `--hack` you only get the `.asm`. If you only have assembly, run `python assembler.py Prog.asm`.
+
+> `assembler.py` on its own only assembles an `.asm` file. To compile HackL, run `hl.py`.
+
+### HackL rules to remember
+
+- **Declare variables first**: `var x;` must appear before `x` is used, otherwise you get
+  `COMPILE ERROR: variable 'x' is not declared`.
+- Numbers are **16-bit** (0 to 65535, or signed -32768 to 32767). Hex (`0xFF`) and binary (`0b101`) work.
+- `/` and `%` need a non-negative dividend and a positive divisor (dividing by 0 gives 0).
+- Deeply nested expressions are rejected; split them into steps using a variable.
+- `const` names are fixed at compile time and cannot be changed.
+- Comments: `// line` and `/* block */`.
+
+### Delay calibration
+
+`delay(ms)` is a software loop, so its accuracy depends on how fast the CPU runs. The default of **8805**
+loop passes per millisecond was measured on the board with an oscilloscope (`delay(1000)` = 1 second).
+To retune, run `calibrate.hl`, time it with a stopwatch, then:
+
+```
+python hl.py prog.hl --hack --iters <new value>
+```
+
+(In the IDE this is `delay_iters` in `~/.hack_ide_config.json`.)
+
+### Tests
+
+```
+python test_hl.py
+```
+
+Compiles many small programs, assembles them with your assembler and checks the results in a Hack CPU simulator.
+
+For the full language see [`HackL_Reference.md`](hackl/HackL_Reference.md).
 
 ---
 
@@ -173,7 +247,7 @@ LED3 = A register bit 0, LED4 = D register bit 0 (these LEDs are active-low).
    `tangnano20k.cst`, set `top` as the top module, then synthesise and place & route.
 2. **Program the board** with the Gowin Programmer (or `openFPGALoader`).
 3. **Install Python 3** and `pyserial` (`pip install pyserial`) on your PC.
-4. **Start the IDE:** `python3 hackl/hack_ide.py`, choose the serial port (115200 baud).
+4. **Start the IDE:** `python3 hack_ide.py` (from the `hackl/` folder), choose the serial port (115200 baud).
 5. Pick **HackL** (or Assembly), write or open a program, and press **Run**.
    The IDE compiles it, assembles it, sends it over UART and starts the CPU.
 
@@ -195,15 +269,35 @@ After the last word, the loader automatically resets and starts the CPU.
 
 ---
 
-## Suggested repository layout
+## Repository layout
 
 ```
-rtl/            Verilog sources (cpu.v, alu.v, memory.v, gpu_*.v, ...)
-constraints/    tangnano20k.cst
-hackl/          hl.py (compiler), hack_ide.py (IDE), HackL_Reference.md, examples/
-docs/           notes, photos, wiring diagram
+rtl/                     Verilog sources
+  top.v                  top level, pin wiring
+  cpu.v  alu.v           Hack CPU
+  computer.v             CPU + program RAM + memory
+  memory.v  sdram.v      address decoder, SDRAM controller
+  program_ram.v          32K x 16 program memory
+  uart_rx.v  uart_loader.v   program upload
+  gpu_top.v  gpu_regs.v  gpu_renderer.v  framebuffer_bram.v   GPU
+  tmds_encoder.v  tmds_serializer.v  Gowin_rPLL.v             HDMI
+  ads1115_i2c_master.v   ADC interface
+  video_timing.v         standalone timing generator (gpu_top.v has its own copy)
+constraints/
+  tangnano20k.cst        pin assignments
+hackl/
+  hl.py                  HackL compiler
+  assembler.py  parser.py  code.py  symbol_table.py   assembler
+  hack_ide.py            IDE
+  test_hl.py             tests
+  HackL_Reference.md     language reference
+  examples/              .hl demo programs
 README.md
 ```
+
+Example programs in `hackl/examples/`: `blink`, `count_1sec`, `calibrate`, `adc_leds`, `adc_bargraph`,
+`adc_voltage`, `adc_graph`, `adc_graph_continuous`, `adc_show`, `adc_gpu_bar`, `adc_gpu_voltage`,
+`gpu_demo`, `gpu_bounce`, `pingpong`, `breakout`.
 
 ---
 
