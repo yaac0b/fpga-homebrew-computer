@@ -316,11 +316,6 @@ Example programs in `hackl/examples/`: `blink`, `count_1sec`, `calibrate`, `adc_
 
 ---
 
-## Credits
 
-- Based on the **Hack computer** from *The Elements of Computing Systems* (Nand2Tetris) by Noam Nisan and Shimon Schocken.
-- Built for the Sipeed Tang Nano 20K with Gowin EDA.
 
-## License
 
-Add your preferred licence here (for example MIT).
